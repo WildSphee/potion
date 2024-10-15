@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from llms.openai import call_openai
 from llms.ppt_prompt import ppt_prompt
 from tools.validator import trim_code_block
+from typing import Callable, Optional
+import asyncio
 
 """Logic Flow
 
@@ -104,6 +106,17 @@ class Potion:
             )
             return {"error": error_type, "details": str(e)}
 
-    def compose(design_schema: List[DesignSchema]) -> os.PathLike:
+    async def compose(self, design_schema: List[DesignSchema]) -> os.PathLike:
         """Create the PPTX base on requirement"""
-        pass
+
+        tasks: List = []
+
+        for ds in design_schema:
+            # get the corresponding ComposeSchema
+            cs: Optional[ComposeSchema] = next((cs for cs in self.compose_schemas if cs.name == ds.compose_schema_name), None)
+            func: Callable = cs.func
+            tasks.append(asyncio.create_task(func(ds)))
+
+
+        results: List = await asyncio.gather(*tasks)
+        

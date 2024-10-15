@@ -10,7 +10,7 @@ ppt_prompt = """
 
 
 convert the above powerpoint outline into json list format like below:
-```
+```json
 [
     {{
         "slide_title": "",
@@ -27,6 +27,6 @@ do not add extra keys / values
 do not add extra notes, start:
 
 
-```
+```json
 
 """
