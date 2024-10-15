@@ -38,5 +38,5 @@ compose_schemas: List[ComposeSchema] = [
 ]
 
 ncspotion = Potion(
-    template_path="nila_ppt_template.pptx", compose_schemas=compose_schemas
+    template_path="templates/nila_ppt_template.pptx", compose_schemas=compose_schemas
 )

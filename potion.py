@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, List, Union, Callable
+from typing import Callable, Dict, List, Union
 
 from pptx import Presentation
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
@@ -55,7 +55,9 @@ class ComposeSchema(BaseModel):
 
 
 class Potion:
-    def __init__(self, template_path: str, compose_schemas: List[ComposeSchema]) -> None:
+    def __init__(
+        self, template_path: str, compose_schemas: List[ComposeSchema]
+    ) -> None:
         self.template_path: str = template_path
         self.compose_schemas: List[ComposeSchema] = compose_schemas
 
@@ -75,7 +77,11 @@ class Potion:
         """From the user description, create a JSON output of the PowerPoint"""
 
         # call to OpenAI API to create the Design Schema
-        json_str = call_openai(ppt_prompt.format(ppt_outline=query, compose_schema=self._create_compose_schema_desc()))
+        json_str = call_openai(
+            ppt_prompt.format(
+                ppt_outline=query, compose_schema=self._create_compose_schema_desc()
+            )
+        )
         json_str = trim_code_block(json_str)
         print(f"Created JSON outline, original: \n{query}\n\n after:\n{json_str}")
 
