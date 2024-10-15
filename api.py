@@ -1,49 +1,22 @@
-import json
-import re
+import os
 from datetime import datetime
+from typing import Literal
 
 from fastapi import FastAPI, Form
 from fastapi.responses import FileResponse
-from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
-from llms.openai import call_openai
-from llms.ppt_prompt import ppt_prompt
 from tools.validator import convert_to_filename
-
-folder_path = "output/"
-
-
-def trim_code_block(json_str):
-    # Use regex to remove ```json and ``` if they exist
-    pattern = r"^```json\s*(.*?)\s*```$"
-    match = re.match(pattern, json_str, re.DOTALL)
-    if match:
-        return match.group(1).strip()
-    return json_str
-
 
 app = FastAPI()
 
 
 @app.post("/create-ppt/")
-async def create_file(content: str = Form(...)):
-    # Simulate call to OpenAI API
-    json_str = call_openai(ppt_prompt.format(ppt_outline=content))
-    json_str = trim_code_block(json_str)
-    print(f"Created JSON outline, original: \n{content}\n\n after:\n{json_str}")
-
-    # Safely parse JSON string into a dictionary
-    try:
-        json_outline = json.loads(json_str)
-    except json.JSONDecodeError as e:
-        return {"error": "Invalid JSON format", "details": str(e)}
-
-    # Load the template presentation
-    template_path = "nila_ppt_template.pptx"
-    presentation = Presentation(template_path)
-
+async def create_file(
+    content: str = Form(...), template: Literal["NILA"] = "NILA"
+) -> FileResponse:
     # Change title and date on slide 1
+    return
     title_slide = presentation.slides[0]
     presentation_title = json_outline.get("title", "Untitled")
     current_date = datetime.now().strftime("%B %d, %Y")
@@ -81,7 +54,7 @@ async def create_file(content: str = Form(...)):
 
     # Save the new presentation
     filename = convert_to_filename(presentation_title)
-    output_path = f"{folder_path}{filename}.pptx"
+    output_path = f"{os.getenv("PPT_OUTPUT_FOLDER") or "output/"}{filename}.pptx"
     presentation.save(output_path)
     print(f"Presentation saved as {output_path}")
     # Return the file as a response

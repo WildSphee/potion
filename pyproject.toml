@@ -18,6 +18,7 @@ pathvalidate = "^3.2.1"
 ruff = "^0.6.4"
 mypy = "^1.11.2"
 replicate = "^0.34.2"
+pydantic = "^2.9.2"
 
 
 [build-system]
