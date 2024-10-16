@@ -21,7 +21,7 @@ async def create_file(
         raise HTTPException(status_code=400, detail="No template matched.")
 
     # creating a design schema
-    design: List[DesignSchema] = ncspotion.design(content, 1)
+    design: List[DesignSchema] = await ncspotion.design(content, 1)
 
     # creating the PPT
     await ncspotion.compose(design)

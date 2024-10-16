@@ -3,6 +3,7 @@ from typing import List
 
 from pptx.slide import Slide, SlideLayout
 
+from llms.openai import call_openai
 from potion import ComposeSchema, DesignSchema, Potion
 
 # creating NCSgpt Potion from slide template
@@ -35,7 +36,11 @@ async def create_text_slide(ds: DesignSchema, slide: Slide) -> None:
             if "slide title" in text:
                 shape.text = ds.slide_title
             elif "slide content" in text:
-                shape.text = ds.desc
+                prompt = f"You are now writing a short analysis of 100 words for one \
+                    of the slides within a powerpoint about {ds.slide_title}, details \
+                    on {ds.desc}.\nProvide empirical data and trends where possible.\
+                    Do not include other comments, give me the short analysis only"
+                shape.text = call_openai(prompt)
 
 
 async def create_end_slide(ds: DesignSchema, slide: SlideLayout) -> None:

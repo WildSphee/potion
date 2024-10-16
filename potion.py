@@ -84,12 +84,14 @@ class Potion:
                 return cs
         raise ComposeSchemaNotFoundError(f"Compose schema '{name}' not found.")
 
-    def design(self, query: str, attempts: int = 2) -> Union[List[DesignSchema], Dict]:
+    async def design(
+        self, query: str, attempts: int = 2
+    ) -> Union[List[DesignSchema], Dict]:
         """From the user description, create a JSON output of the PowerPoint."""
         for attempt in range(attempts + 1):
             try:
                 # Call to OpenAI API to create the Design Schema
-                json_str = call_openai(
+                json_str = await call_openai(
                     ppt_prompt.format(
                         ppt_outline=query,
                         compose_schema=self._create_compose_schema_desc(),
