@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 import os
 from copy import deepcopy
 from typing import Callable, Dict, List, Union
@@ -12,52 +14,48 @@ from llms.openai import call_openai
 from llms.ppt_prompt import ppt_prompt
 from tools.validator import convert_to_filename, trim_code_block
 
-"""Logic Flow
-
-user input a query - eg: "design a ppt about goose"
-
-LLM first generates a list of DesignSchema, giving each slide a title, a description of their content, and their compose_schema_name
-
-for each DesignSchema (slide), get their corresponding func from ComposeSchema, input the desc and title into it, and ask it to generate a PPT. 
-
-gather all async func results, compose them into one single PPT
-
-Returns a path to the PPT
-"""
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 
 class DesignSchema(BaseModel):
     """
-    This BaseModel is used for each slide during the design phase
+    This BaseModel is used for each slide during the design phase.
     """
 
-    slide_title: str = Field(..., description="Name of the slide, eg: flowchart")
+    slide_title: str = Field(..., description="Name of the slide, e.g., 'Flowchart'")
     desc: str = Field(
         ...,
-        description="Description to when to use this slide, eg: to create a flowchart to represent time series events",
+        description="Description of when to use this slide, e.g., 'To create a flowchart representing time series events'",
     )
     compose_schema_name: str = Field(
-        ..., description="name of the compose schema to be used"
+        ..., description="Name of the compose schema to be used"
     )
 
 
 class ComposeSchema(BaseModel):
     """
-    This BaseModel is used for each slide during the compose phase
+    This BaseModel is used for each slide during the compose phase.
     """
 
-    name: str = Field(..., description="Name of the slide, eg: flowchart")
+    name: str = Field(..., description="Name of the slide, e.g., 'Flowchart'")
     desc: str = Field(
         ...,
-        description="When to use this slide, eg: to create a flowchart to represent time series events",
+        description="When to use this slide, e.g., 'To create a flowchart representing time series events'",
     )
     func: Callable = Field(
         ...,
-        description="Function to input the schema and create the slide, returns a pptx slide obj",
+        description="Function to input the schema and create the slide; returns a pptx Slide object",
     )
     slide_layout_index: int = Field(
-        ..., description="which slide layout to use for each slide type"
+        ..., description="Which slide layout to use for each slide type"
     )
+
+
+class ComposeSchemaNotFoundError(Exception):
+    """Exception raised when a ComposeSchema is not found."""
+
+    pass
 
 
 class Potion:
@@ -66,12 +64,12 @@ class Potion:
     ) -> None:
         self.template_path: str = template_path
         self.compose_schemas: List[ComposeSchema] = compose_schemas
-
         self.presentation = Presentation(template_path)
         self.ppt_length: int = len(self.presentation.slides)
+        logging.info(f"Loaded presentation with {self.ppt_length} slides.")
 
     def _create_compose_schema_desc(self) -> str:
-        """Create a str interpretation of all the compose schemas"""
+        """Create a string interpretation of all the compose schemas."""
         res = "**************\n"
         for schema in self.compose_schemas:
             res += f"compose_schema_name: {schema.name}\n"
@@ -79,36 +77,47 @@ class Potion:
             res += "**************\n"
         return res
 
+    def get_compose_schema(self, name: str) -> ComposeSchema:
+        """Retrieve a ComposeSchema by name."""
+        for cs in self.compose_schemas:
+            if cs.name == name:
+                return cs
+        raise ComposeSchemaNotFoundError(f"Compose schema '{name}' not found.")
+
     def design(self, query: str, attempts: int = 2) -> Union[List[DesignSchema], Dict]:
-        """From the user description, create a JSON output of the PowerPoint"""
+        """From the user description, create a JSON output of the PowerPoint."""
+        for attempt in range(attempts + 1):
+            try:
+                # Call to OpenAI API to create the Design Schema
+                json_str = call_openai(
+                    ppt_prompt.format(
+                        ppt_outline=query,
+                        compose_schema=self._create_compose_schema_desc(),
+                    )
+                )
+                json_str = trim_code_block(json_str)
+                logging.info(f"Created JSON outline:\n{json_str}")
 
-        # call to OpenAI API to create the Design Schema
-        json_str = call_openai(
-            ppt_prompt.format(
-                ppt_outline=query, compose_schema=self._create_compose_schema_desc()
-            )
-        )
-        json_str = trim_code_block(json_str)
-        print(f"Created JSON outline, original: \n{query}\n\n after:\n{json_str}")
+                # Load the output into List[DesignSchema] format and return it
+                json_outline = json.loads(json_str)
+                adapter = TypeAdapter(List[DesignSchema])
+                design_schemas = adapter.validate_python(json_outline)
+                logging.info("Successfully validated design schemas.")
+                return design_schemas
 
-        try:
-            # load the output into List[DesignSchema] format and return it
-            json_outline = json.loads(json_str)
-            adapter = TypeAdapter(List[DesignSchema])
-            return adapter.validate_python(json_outline)
-
-        except (json.JSONDecodeError, ValidationError) as e:
-            # if the json parsing failed or casting to List[DesignSchema] fails, recursively retry again
-            if attempts > 0:
-                return self.design(query, attempts - 1)
-
-            # Return error details after all attempts fail
-            error_type = (
-                "Invalid JSON format"
-                if isinstance(e, json.JSONDecodeError)
-                else "Validation error"
-            )
-            return {"error": error_type, "details": str(e)}
+            except (json.JSONDecodeError, ValidationError) as e:
+                if attempt == attempts:
+                    # Return error details after all attempts fail
+                    error_type = (
+                        "Invalid JSON format"
+                        if isinstance(e, json.JSONDecodeError)
+                        else "Validation error"
+                    )
+                    logging.error(f"{error_type}: {e}")
+                    return {"error": error_type, "details": str(e)}
+                else:
+                    logging.warning(f"Attempt {attempt + 1} failed: {e}")
+                    continue
 
     def duplicate_slide(self, slide_index: int) -> Slide:
         """
@@ -119,11 +128,12 @@ class Potion:
             slide_index (int): The index of the slide to duplicate.
 
         Returns:
-            The new slide that is a duplicate of the original one.
+            Slide: The new slide that is a duplicate of the original one.
         """
         source_slide = self.presentation.slides[slide_index]
-        # Use the same slide layout as the source slide
-        slide_layout = source_slide.slide_layout
+        slide_layout = (
+            source_slide.slide_layout
+        )  # Use the same layout as the source slide
         new_slide = self.presentation.slides.add_slide(slide_layout)
 
         # Copy shapes from the source slide to the new slide
@@ -137,32 +147,7 @@ class Potion:
         self.remove_empty_placeholders(new_slide)
 
         # Copy slide background (if any)
-        source_fill = source_slide.background.fill
-        new_fill = new_slide.background.fill
-
-        if source_fill.type == MSO_FILL.SOLID:
-            # Set the fill to solid and copy the color
-            new_fill.solid()
-            new_fill.fore_color.rgb = source_fill.fore_color.rgb
-        elif source_fill.type == MSO_FILL.GRADIENT:
-            # Handle gradient fill if necessary
-            new_fill.gradient()
-            # Implement copying gradient stops if needed
-        elif source_fill.type == MSO_FILL.PICTURE:
-            # Handle picture fill if necessary
-            image = source_fill.picture.image
-            new_fill.user_picture(image.blob)
-        elif source_fill.type == MSO_FILL.PATTERNED:
-            # Handle patterned fill if necessary
-            new_fill.patterned()
-            # Copy pattern details
-        elif source_fill.type == MSO_FILL.TEXTURED:
-            # Handle textured fill if necessary
-            new_fill.texture()
-            # Copy texture details
-        else:
-            # No fill or unsupported fill type
-            new_fill.background()  # Sets the fill to no fill
+        self.copy_slide_background(source_slide, new_slide)
 
         # Copy slide notes (if any)
         if source_slide.has_notes_slide:
@@ -172,22 +157,49 @@ class Potion:
                 source_notes_slide.notes_text_frame.text
             )
 
+        logging.info(f"Duplicated slide {slide_index}.")
         return new_slide
 
-    def remove_empty_placeholders(self, slide):
+    def copy_slide_background(self, source_slide: Slide, target_slide: Slide) -> None:
+        """
+        Copy the background from one slide to another.
+
+        Args:
+            source_slide (Slide): The slide to copy the background from.
+            target_slide (Slide): The slide to copy the background to.
+        """
+        source_fill = source_slide.background.fill
+        target_fill = target_slide.background.fill
+
+        if source_fill.type == MSO_FILL.SOLID:
+            target_fill.solid()
+            target_fill.fore_color.rgb = source_fill.fore_color.rgb
+        elif source_fill.type == MSO_FILL.GRADIENT:
+            target_fill.gradient()
+            # Copy gradient stops if needed
+        elif source_fill.type == MSO_FILL.PICTURE:
+            image = source_fill.picture.image
+            target_fill.user_picture(image.blob)
+        elif source_fill.type == MSO_FILL.PATTERNED:
+            target_fill.patterned()
+            # Copy pattern details
+        elif source_fill.type == MSO_FILL.TEXTURED:
+            target_fill.texture()
+            # Copy texture details
+        else:
+            target_fill.background()  # Sets the fill to no fill
+
+    def remove_empty_placeholders(self, slide: Slide) -> None:
         """
         Remove empty placeholders from a slide.
 
         Args:
-            slide: The Slide object from which to remove empty placeholders.
+            slide (Slide): The slide from which to remove empty placeholders.
         """
-        # Collect shapes to remove to avoid modifying the shapes collection while iterating
         shapes_to_remove = []
-
         for shape in slide.shapes:
             if shape.is_placeholder:
                 if shape.has_text_frame:
-                    # Check if the text frame is empty
                     if not shape.text.strip():
                         shapes_to_remove.append(shape)
                 else:
@@ -199,35 +211,52 @@ class Potion:
             slide.shapes._spTree.remove(shape.element)
 
     async def compose(self, design_schemas: List[DesignSchema]) -> None:
-        """Create the PPTX based on the design schema list"""
-
+        """Create the PPTX based on the design schema list."""
+        tasks = []
         for ds in design_schemas:
             # Find the corresponding ComposeSchema
-            compose_schema = None
-            for cs in self.compose_schemas:
-                if cs.name == ds.compose_schema_name:
-                    compose_schema = cs
-
-            if compose_schema is None:
-                raise Exception(f"its none: {ds.compose_schema_name}")
-
-            slide: Slide = self.presentation.slides[compose_schema.slide_layout_index]
+            compose_schema = self.get_compose_schema(ds.compose_schema_name)
 
             # Duplicate target slide
             slide = self.duplicate_slide(compose_schema.slide_layout_index)
-            # Edit the slide
-            await compose_schema.func(ds, slide)
 
-        # Remove the template slides by accessing the internal slide ID list
+            # Append the async function to tasks
+            tasks.append(compose_schema.func(ds, slide))
+
+        await asyncio.gather(*tasks)
+
+        # Remove the template slides
+        self.remove_template_slides()
+        logging.info("Completed composing the presentation.")
+
+    def remove_template_slides(self) -> None:
+        """Removes the initial template slides from the presentation."""
         slide_ids = self.presentation.slides._sldIdLst
         for _ in range(self.ppt_length):
-            slide_ids.remove(slide_ids[0])
+            try:
+                rId = slide_ids[0].rId
+                self.presentation.part.drop_rel(rId)
+                del slide_ids[0]
+            except Exception as e:
+                logging.error(f"Error removing slide: {e}")
 
-    def save(self) -> os.PathLike:
-        filename = convert_to_filename("output")
-        output_path: os.PathLike = (
-            f'{os.getenv("PPT_OUTPUT_FOLDER") or "output/"}{filename}.pptx'
-        )
+    def save(self, filename: str = "output") -> os.PathLike:
+        """
+        Save the presentation to a file.
+
+        Attribute:
+            filename (str): the name of the output file.
+
+        Returns:
+            os.PathLike: The path to the saved presentation.
+        """
+
+        filename = convert_to_filename(filename)
+        output_folder = os.getenv("PPT_OUTPUT_FOLDER", "output/")
+        os.makedirs(output_folder, exist_ok=True)
+
+        output_path = os.path.join(output_folder, f"{filename}.pptx")
         self.presentation.save(output_path)
+        logging.info(f"Presentation saved to {output_path}.")
 
         return output_path
