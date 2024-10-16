@@ -3,6 +3,7 @@ import os
 from typing import Callable, Dict, List, Union
 
 from pptx import Presentation
+from pptx.slide import SlideLayout
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from llms.openai import call_openai
@@ -112,22 +113,21 @@ class Potion:
 
         for ds in design_schemas:
             # Find the corresponding ComposeSchema
-            print("COMPOSING", ds)
-            compose_schema = next(
-                (
-                    cs
-                    for cs in self.compose_schemas
-                    if cs.name == ds.compose_schema_name
-                ),
-                None,
-            )
+            compose_schema = None
+            for cs in self.compose_schemas:
+                if cs.name == ds.compose_schema_name:
+                    compose_schema = cs
+
             if compose_schema is None:
                 continue
 
             # Get the slide layout to use
-            slide_layout = self.presentation.slide_layouts[
+            slide_layout: SlideLayout = self.presentation.slide_layouts[
                 compose_schema.slide_layout_index
             ]
+
+            print("COMPOSING", ds, compose_schema)
+            print(f"{slide_layout=}")
 
             # Add a new slide based on the layout
             slide = self.presentation.slides.add_slide(slide_layout)
