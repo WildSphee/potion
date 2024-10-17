@@ -66,7 +66,9 @@ class Potion:
         self.compose_schemas: List[ComposeSchema] = compose_schemas
         self.presentation = Presentation(template_path)
         self.ppt_length: int = len(self.presentation.slides)
-        logging.info(f"Loaded presentation with {self.ppt_length} slides.")
+        logging.info(
+            f"Loaded presentation with {self.ppt_length} slides.\nWith ComposeSchemas length of {len(compose_schemas)}"
+        )
 
     def _create_compose_schema_desc(self) -> str:
         """Create a string interpretation of all the compose schemas."""
