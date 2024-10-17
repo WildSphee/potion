@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 
 from ncsgpt_potion import ncspotion
 from potion import DesignSchema
+from tools.validator import convert_to_filename
 
 app = FastAPI()
 
@@ -26,8 +27,11 @@ async def create_file(
     # creating the PPT
     await ncspotion.compose(design)
 
+    # create filename
+    filename = convert_to_filename(design[0].desc)
+
     # saving the PPT
-    path = ncspotion.save(design[0].desc)
+    path = ncspotion.save(filename)
 
     return FileResponse(
         path,

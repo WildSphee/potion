@@ -160,12 +160,12 @@ compose_schemas: List[ComposeSchema] = [
         func=create_image_slide_builder(aspect_ratio="3:2"),
         slide_layout_index=4,
     ),
-    ComposeSchema(
-        name="user_flow_slide",
-        desc="Use this slide when to present a trend / user journey / directional data.",
-        func=create_flow_chart_slide,
-        slide_layout_index=5,
-    ),
+    # ComposeSchema(
+    #     name="user_flow_slide",
+    #     desc="Use this slide when to present a trend / user journey / directional data.",
+    #     func=create_flow_chart_slide,
+    #     slide_layout_index=5,
+    # ),
     ComposeSchema(
         name="end_slide",
         desc="Use this slide when it's the end of a presentation. There can only be one per presentation",
