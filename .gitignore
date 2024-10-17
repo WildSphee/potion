@@ -6,7 +6,8 @@ __pycache__
 venv
 
 # outputs
-output/
+output/*.pptx
+output/*.jpg
 
 # testing folder
 testing/
