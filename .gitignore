@@ -8,6 +8,3 @@ venv
 # outputs
 output/*.pptx
 output/*.jpg
-
-# testing folder
-testing/
