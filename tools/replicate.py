@@ -22,7 +22,7 @@ async def create_image(
         "num_outputs": 1,
         "prompt_strength": 0.8,
         "num_inference_steps": 28,
-        "aspect_ratio": "3:2",
+        "aspect_ratio": aspect_ratio,
         "output_format": "jpg",
         "output_quality": 80,
     }
