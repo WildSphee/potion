@@ -82,6 +82,12 @@ class Potion:
                 return cs
         raise HTTPException(500, f"Compose schema '{name}' not found.")
 
+    # async def plan(
+    #     self, topic: str
+    # ) -> str:
+    #     res = await call_openai(f'Generate a title for a powerpoint in the following format on the topic of {topic} do not include " or quotes blocks.')
+    #     return res
+
     async def design(
         self, query: str, attempts: int = 2
     ) -> Union[List[DesignSchema], Dict]:
