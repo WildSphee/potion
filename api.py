@@ -4,8 +4,8 @@ from typing import List, Literal
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import FileResponse
 
-from ncsgpt_potion import ncspotion
-from potion import DesignSchema
+from ncsgpt_potion import compose_schemas as ncs_compose_schemas
+from potion import DesignSchema, Potion
 from tools.validator import convert_to_filename
 
 app = FastAPI()
@@ -13,20 +13,23 @@ app = FastAPI()
 
 @app.post("/create-ppt/")
 async def create_file(
-    content: str = Form(...), template: Literal["NILA"] = "NILA"
+    content: str = Form(...), template: Literal["NCSGPT"] = "NCSGPT"
 ) -> FileResponse:
     potion = None
-    if template == "NILA":
-        potion = ncspotion
+    if template == "NCSGPT":
+        potion = Potion(
+            template_path="templates/nila_ppt_template.pptx",
+            compose_schemas=ncs_compose_schemas,
+        )
 
     if potion is None:
         raise HTTPException(status_code=400, detail="No template matched.")
 
     # creating a design schema
-    design: List[DesignSchema] = await ncspotion.design(content, 1)
+    design: List[DesignSchema] = await potion.design(content, 1)
 
     # creating the PPT
-    await ncspotion.compose(design)
+    await potion.compose(design)
 
     # create filename
     # filename = await call_openai(f'Generate a filename for a powerpoint base on the the \
@@ -35,7 +38,7 @@ async def create_file(
     filename = convert_to_filename(str(uuid.uuid4()))
 
     # saving the PPT
-    path = ncspotion.save(filename)
+    path = potion.save(filename)
 
     return FileResponse(
         path,

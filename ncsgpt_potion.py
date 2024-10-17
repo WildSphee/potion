@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from io import BytesIO
 from typing import List
@@ -6,9 +7,11 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.slide import Slide, SlideLayout
 
 from llms.openai import call_openai
-from potion import ComposeSchema, DesignSchema, Potion
+from llms.ppt_prompt import image_slide_prompt
+from potion import ComposeSchema, DesignSchema
 from tools.formatter import process_markdown_to_ppt
 from tools.replicate import create_image
+from tools.validator import trim_code_block
 
 # creating NCSgpt Potion from slide template
 
@@ -72,8 +75,25 @@ def create_image_slide_builder(aspect_ratio: str = "1:1") -> callable:
     async def create_image_slide(ds: DesignSchema, slide: Slide) -> None:
         image_data = None
 
+        # content are based on design schema description by default
+        image_desc = ds.desc
+        slide_content_desc = ds.desc
+        # Use LLM to generate the slide content and image description
+        try:
+            json_str = await call_openai(
+                image_slide_prompt(
+                    slide_title=ds.slide_title, slide_description=ds.desc
+                )
+            )
+            json_str = trim_code_block(json_str)
+            json_outline = dict(json.loads(json_str))
+            image_desc = json_outline.get("image_description")
+            slide_content_desc = json_outline.get("slide_content")
+        except Exception:
+            pass
+
         # create an image using replicate
-        image_path = await create_image(ds.desc, aspect_ratio=aspect_ratio)
+        image_path = await create_image(image_desc, aspect_ratio=aspect_ratio)
 
         # read image
         try:
@@ -95,7 +115,7 @@ def create_image_slide_builder(aspect_ratio: str = "1:1") -> callable:
                 if "slide title" in text:
                     shape.text = ds.slide_title
                 elif "slide content" in text:
-                    shape.text = ds.desc
+                    shape.text = slide_content_desc
                 continue
 
             # replace image
@@ -174,7 +194,3 @@ compose_schemas: List[ComposeSchema] = [
         slide_layout_index=6,
     ),
 ]
-
-ncspotion = Potion(
-    template_path="templates/nila_ppt_template.pptx", compose_schemas=compose_schemas
-)
