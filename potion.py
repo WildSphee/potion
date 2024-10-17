@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from copy import deepcopy
-from typing import Callable, Dict, List, Union
+from typing import Callable, List
 
 from fastapi import HTTPException
 from pptx import Presentation
@@ -88,10 +88,19 @@ class Potion:
     #     res = await call_openai(f'Generate a title for a powerpoint in the following format on the topic of {topic} do not include " or quotes blocks.')
     #     return res
 
-    async def design(
-        self, query: str, attempts: int = 2
-    ) -> Union[List[DesignSchema], Dict]:
-        """From the user description, create a JSON output of the PowerPoint."""
+    async def design(self, query: str, attempts: int = 2) -> List[DesignSchema]:
+        """
+        From the user description, create a JSON output of the PowerPoint.
+
+        Attributes:
+            query (str): user description of the powerpoint, starting from slide 0
+                each slide should have a slide title and a description of what the slide will be about.
+                the content can be unstructured.
+            attempt (int): the number of maximum attempts to retry upon failure to generate / parse
+
+        Return:
+            List[DesignSchema]: a list of designschema for composing a powerpoint
+        """
         for attempt in range(attempts + 1):
             try:
                 # Call to OpenAI API to create the Design Schema
@@ -120,7 +129,7 @@ class Potion:
                         else "Validation error"
                     )
                     logging.error(f"{error_type}: {e}")
-                    return {"error": error_type, "details": str(e)}
+                    raise HTTPException(500, f"{error_type}: {str(e)}")
                 else:
                     logging.warning(f"Attempt {attempt + 1} failed: {e}")
                     continue
@@ -136,6 +145,7 @@ class Potion:
         Returns:
             Slide: The new slide that is a duplicate of the original one.
         """
+
         source_slide = self.presentation.slides[slide_index]
         slide_layout = (
             source_slide.slide_layout
@@ -150,10 +160,10 @@ class Potion:
             )
 
         # Remove empty placeholders from the new slide
-        self.remove_empty_placeholders(new_slide)
+        self._remove_empty_placeholders(new_slide)
 
         # Copy slide background (if any)
-        self.copy_slide_background(source_slide, new_slide)
+        self._copy_slide_background(source_slide, new_slide)
 
         # Copy slide notes (if any)
         if source_slide.has_notes_slide:
@@ -166,7 +176,7 @@ class Potion:
         logging.info(f"Duplicated slide {slide_index}.")
         return new_slide
 
-    def copy_slide_background(self, source_slide: Slide, target_slide: Slide) -> None:
+    def _copy_slide_background(self, source_slide: Slide, target_slide: Slide) -> None:
         """
         Copy the background from one slide to another.
 
@@ -195,7 +205,7 @@ class Potion:
         else:
             target_fill.background()  # Sets the fill to no fill
 
-    def remove_empty_placeholders(self, slide: Slide) -> None:
+    def _remove_empty_placeholders(self, slide: Slide) -> None:
         """
         Remove empty placeholders from a slide.
 
@@ -217,7 +227,19 @@ class Potion:
             slide.shapes._spTree.remove(shape.element)
 
     async def compose(self, design_schemas: List[DesignSchema]) -> None:
-        """Create the PPTX based on the design schema list."""
+        """
+        Create the PPTX based on the design schema list.
+        1. loop through the design schema
+            a. get the corresponding compose schema referenced in the design schema
+            b. duplicate the slide the compose schema is referencing to to the end.
+            c. taking the output from the design schema, feed it into the compose schema function
+            d. each function edits the slide inplace.
+        2. after all editing is finished. Remove all template slides in the beginning.
+
+        Attributes:
+            design_schemas (List[DesignSchema]): a list of designs for composing the slide
+                object with.
+        """
         tasks = []
         for ds in design_schemas:
             # Find the corresponding ComposeSchema
@@ -232,10 +254,10 @@ class Potion:
         await asyncio.gather(*tasks)
 
         # Remove the template slides
-        self.remove_template_slides()
+        self._remove_template_slides()
         logging.info("Completed composing the presentation.")
 
-    def remove_template_slides(self) -> None:
+    def _remove_template_slides(self) -> None:
         """Removes the initial template slides from the presentation."""
         slide_ids = self.presentation.slides._sldIdLst
         for _ in range(self.ppt_length):
@@ -254,7 +276,7 @@ class Potion:
             filename (str): the name of the output file.
 
         Returns:
-            os.PathLike: The path to the saved presentation.
+            os.PathLike: The path to the saved pptx presentation.
         """
 
         filename = convert_to_filename(filename)
