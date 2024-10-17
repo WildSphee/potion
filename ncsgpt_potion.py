@@ -2,6 +2,7 @@ from datetime import datetime
 from io import BytesIO
 from typing import List
 
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.slide import Slide, SlideLayout
 
 from llms.openai import call_openai
@@ -67,37 +68,38 @@ async def create_point_form_slide(ds: DesignSchema, slide: Slide) -> None:
                 process_markdown_to_ppt(shape, res)
 
 
-async def create_image_slide(ds: DesignSchema, slide: Slide) -> None:
-    image_data = None
+def create_image_slide_builder(aspect_ratio: str = "1:1") -> callable:
+    async def create_image_slide(ds: DesignSchema, slide: Slide) -> None:
+        image_data = None
 
-    # create an image using replicate
-    image_path = await create_image(ds.desc)
+        # create an image using replicate
+        image_path = await create_image(ds.desc, aspect_ratio=aspect_ratio)
 
-    # read image
-    try:
-        with open(image_path, "rb") as f:
-            image_data = f.read()
-    except FileNotFoundError:
-        print(f"Local image file not found: {image_path}")
-        return
+        # read image
+        try:
+            with open(image_path, "rb") as f:
+                image_data = f.read()
+        except FileNotFoundError:
+            print(f"Local image file not found: {image_path}")
+            return
 
-    if image_data is None:
-        print("Unable to load image data.")
-        return
+        if image_data is None:
+            print("Unable to load image data.")
+            return
 
-    # Replace the image placeholder with the actual image
-    for shape in slide.shapes:
-        if shape.is_placeholder:
+        # Replace the image placeholder with the actual image
+        for shape in slide.shapes:
+            # replace title and description
             if shape.has_text_frame:
                 text = shape.text.strip().replace("\n", "").replace("\r", "").lower()
                 if "slide title" in text:
                     shape.text = ds.slide_title
-                elif "image left content" in text:
+                elif "slide content" in text:
                     shape.text = ds.desc
+                continue
 
-            placeholder_name = shape.name.strip().lower()
-            if "picture" in placeholder_name or "image" in placeholder_name:
-                # Remove the placeholder shape
+            # replace image
+            if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                 sp = shape.element
                 sp.getparent().remove(sp)
 
@@ -107,9 +109,7 @@ async def create_image_slide(ds: DesignSchema, slide: Slide) -> None:
                     image_stream, shape.left, shape.top, shape.width, shape.height
                 )
                 print("Image has been inserted into the slide.")
-                break  # Assuming only one image placeholder
-    else:
-        print("No suitable image placeholder found on the slide.")
+    return create_image_slide
 
 
 async def create_flow_chart_slide(ds: DesignSchema, slide: SlideLayout) -> None:
@@ -151,13 +151,13 @@ compose_schemas: List[ComposeSchema] = [
     ComposeSchema(
         name="image_right_slide",
         desc="Similar to text_slide, with an image on the right. Use it Sparingly to introduce variety.",
-        func=create_image_slide,
+        func=create_image_slide_builder(aspect_ratio="2:3"),
         slide_layout_index=3,
     ),
     ComposeSchema(
         name="image_left_slide",
         desc="Similar to text_slide, with an image on the left. Use it Sparingly to introduce variety.",
-        func=create_image_slide,
+        func=create_image_slide_builder(aspect_ratio="3:2"),
         slide_layout_index=4,
     ),
     ComposeSchema(

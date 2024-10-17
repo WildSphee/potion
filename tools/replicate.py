@@ -12,6 +12,7 @@ async def create_image(
     prompt: Optional[
         str
     ] = "Singaporeans working in an office, collaborating, on computer, desk, high resolution, field of depth.",
+    aspect_ratio: str = "3:2",
 ) -> str:
     input_params = {
         "prompt": prompt,

@@ -5,6 +5,7 @@ import os
 from copy import deepcopy
 from typing import Callable, Dict, List, Union
 
+from fastapi import HTTPException
 from pptx import Presentation
 from pptx.enum.dml import MSO_FILL
 from pptx.slide import Slide
@@ -52,18 +53,13 @@ class ComposeSchema(BaseModel):
     )
 
 
-class ComposeSchemaNotFoundError(Exception):
-    """Exception raised when a ComposeSchema is not found."""
-
-    pass
-
-
 class Potion:
     def __init__(
         self, template_path: str, compose_schemas: List[ComposeSchema]
     ) -> None:
         self.template_path: str = template_path
         self.compose_schemas: List[ComposeSchema] = compose_schemas
+
         self.presentation = Presentation(template_path)
         self.ppt_length: int = len(self.presentation.slides)
         logging.info(
@@ -84,7 +80,7 @@ class Potion:
         for cs in self.compose_schemas:
             if cs.name == name:
                 return cs
-        raise ComposeSchemaNotFoundError(f"Compose schema '{name}' not found.")
+        raise HTTPException(500, f"Compose schema '{name}' not found.")
 
     async def design(
         self, query: str, attempts: int = 2
