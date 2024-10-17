@@ -36,13 +36,14 @@ async def create_image(
         raise HTTPException(status_code=500, detail=f"Replicate Generation Error: {e}")
 
     # Construct the full path for the output file
-    output_path = os.path.join("output", f"{str(uuid.uuid4())}.jpg")
+    output_path = os.path.join(
+        os.getenv("IMAGE_OUTPUT_FOLDER", "output"), f"{str(uuid.uuid4())}.jpg"
+    )
 
     # Download the image and save it without streaming
     try:
         response = requests.get(output)
         if response.status_code == 200:
-            os.makedirs("templates", exist_ok=True)
             with open(output_path, "wb") as f:
                 f.write(response.content)
         else:
