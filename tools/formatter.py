@@ -54,3 +54,6 @@ def process_markdown_to_ppt(shape, text: str):
 
     # Ensure the content fits in the text box (optional)
     text_frame.word_wrap = True
+
+    # add a new line after each -
+    shape.text = shape.text.replace("-", "\n-")
