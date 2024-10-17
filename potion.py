@@ -12,7 +12,7 @@ from pptx.slide import Slide
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from llms.openai import call_openai
-from llms.ppt_prompt import ppt_prompt
+from llms.ppt_prompt import design_prompt
 from tools.validator import convert_to_filename, trim_code_block
 
 # Configure logging
@@ -105,7 +105,7 @@ class Potion:
             try:
                 # Call to OpenAI API to create the Design Schema
                 json_str = await call_openai(
-                    ppt_prompt.format(
+                    design_prompt.format(
                         ppt_outline=query,
                         compose_schema=self._create_compose_schema_desc(),
                     )

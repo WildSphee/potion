@@ -1,4 +1,4 @@
-ppt_prompt = """
+design_prompt = """
 
 ```PPT outline
 {ppt_outline}
