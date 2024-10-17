@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "potion"
 version = "0.1.0"
-description = "PowerPoint Generation X"
+description = "PowerPoint Generation Library Powered by Gen-AI"
 authors = ["Reagan <rrr.chanhiulok@gmail.com>"]
 readme = "README.md"
 package-mode = false 
