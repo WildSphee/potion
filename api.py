@@ -32,7 +32,7 @@ async def create_file(
     # filename = await call_openai(f'Generate a filename for a powerpoint base on the the \
     #     description: \n\******\n{content}\n******\n\
     #     do not include " or quotes blocks. Make it 3 words or less. like "AWS vs Azure": ')
-    filename = convert_to_filename(uuid.uuid4())
+    filename = convert_to_filename(str(uuid.uuid4()))
 
     # saving the PPT
     path = ncspotion.save(filename)
