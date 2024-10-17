@@ -42,16 +42,41 @@ To run the API server, execute:
 ```sh
 sh scripts/start.sh
 ```
+By default the port opened is 8888
+
+5. **Visit FastAPI Docs**
+
+visit [localhost:8888/docs](localhost:8888/docs) for FastAPI swagger docs.
+
+6. **Generate PPT**
+
+Input your powerpoint outline into the `create-ppt/` endpoint, and let Potion handle the rest!
+Doesn't have to follow this format, here's just an example:
+```text
+Slide 0: Title Slide - 
+This slide will display the presentation title: "Exploring Global Cuisines and Restaurant Sales Trends."
+
+Slide 1: Global Overview of Cuisines - 
+This slide will describe the most popular cuisines globally, highlighting the appeal of cuisines like Italian, Chinese, Indian, and Japanese.
+
+Slide 2: Regional Preferences - 
+This slide will present data on regional preferences, such as the popularity of American fast food in North America and Asian cuisines in Southeast Asia.
+
+Slide 3: Sales Trends in Restaurants by Region - 
+This slide will show restaurant sales data for major markets, comparing regions like North America, Europe, and Asia in terms of growth and market size.
+...
+```
+
 
 ## Configuration
 
 Create a `.env` file in the root directory with the following format:
 
 ```py
-OPENAI_API_KEY=<start with sk-> 
+OPENAI_API_KEY=<starts_with_sk> 
 
 # Replicate Image Generation
-REPLICATE_API_TOKEN= 
+REPLICATE_API_TOKEN=<for_image_generation>
 
 # PPT Output folder
 PPT_OUTPUT_FOLDER=output/
@@ -79,8 +104,6 @@ path = ncspotion.save(design[0].desc)
 
 print(path)
 ```
-
-This will start a FastAPI server on port 8888. Access it at `<IP>:8888/create-ppt/` to create presentations via the API.
 
 ### Development Tools
 
